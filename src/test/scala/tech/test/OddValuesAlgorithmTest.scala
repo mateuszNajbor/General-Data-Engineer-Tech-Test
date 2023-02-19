@@ -20,6 +20,15 @@ class OddValuesAlgorithmTest extends AnyFunSuite with BeforeAndAfterAll with Mat
   val outputDirSmall = "src/test/resources/output_small"
   val outputDirBig = "src/test/resources/output_big"
 
+  val outputDirectories: List[String] = List(outputDirSmall, outputDirBig)
+
+  override def beforeAll(): Unit = {
+    outputDirectories.foreach { dirName =>
+      val dir = new Directory(new File(dirName))
+      dir.createDirectory()
+    }
+  }
+
   test("Test small input") {
     val expectedResult = List(List(0, 9), List(430, 64), List(278, 0), List(451, 94), List(373, 157), List(205, 49))
     val inputDir = "src/test/resources/input_small"
@@ -44,17 +53,6 @@ class OddValuesAlgorithmTest extends AnyFunSuite with BeforeAndAfterAll with Mat
     result should contain allElementsOf expectedResult
   }
 
-  override def afterAll(): Unit = {
-    val directoriesToClean = List(outputDirSmall, outputDirBig)
-
-    directoriesToClean.foreach { dirName =>
-      val dir = new Directory(new File(dirName))
-      dir.list.foreach(fileName =>
-        new File(fileName.toString).delete()
-      )
-    }
-  }
-
   private def getDataFromOutputFiles(outputDir: String) = {
     val dir = new Directory(new File(outputDir))
     dir.list.toList.flatMap { fileName =>
@@ -63,5 +61,14 @@ class OddValuesAlgorithmTest extends AnyFunSuite with BeforeAndAfterAll with Mat
       source.close()
       lines
     }.map(_.split("\t").map(_.toInt).toList)
+  }
+
+  override def afterAll(): Unit = {
+    outputDirectories.foreach { dirName =>
+      val dir = new Directory(new File(dirName))
+      dir.list.foreach(fileName =>
+        new File(fileName.toString).delete()
+      )
+    }
   }
 }
