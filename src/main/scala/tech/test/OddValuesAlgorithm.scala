@@ -4,12 +4,23 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 
 import java.io.{BufferedWriter, FileWriter}
+import scala.collection.mutable
 import scala.util.Using
 
 object OddValuesAlgorithm {
 
   def filterValuesOccurringOddNumberOfTimes(input: String, output: String, spark: SparkSession): Unit = {
-    val initialRDD = spark.sparkContext
+    val initialRDD = readAndCleanData(input, spark)
+
+    val resultRDD = initialRDD.groupByKey.mapValues(algorithmWithGroupBy)
+
+    saveAsTSVFile(output, resultRDD)
+    //saveAsTextWithTSVFormat(output, resultRDD)
+    //saveAsCSVWithTSVFormat(output, resultRDD, spark)
+  }
+
+  private def readAndCleanData(input: String, spark: SparkSession): RDD[(Int, Int)] = {
+    spark.sparkContext
       .wholeTextFiles(input)
       .flatMap(_._2.split("\n").drop(1)
         .map(_.split("[\t,]", -1))
@@ -21,14 +32,43 @@ object OddValuesAlgorithm {
         )
         .iterator
       )
+  }
 
-    val resultRDD = initialRDD.groupByKey.mapValues { values =>
-      values.groupBy(identity).filter(_._2.size % 2 == 1).head._1
+  /*
+  * Time complexity:
+  * - groupBy is 0(n)
+  * - find is O(lg(n)) in normal case, in worse case is 0(n). Size of iterable depends on the collection used. Probably O(lg(n)) in normal case, in worse case is 0(n)
+  *
+  * Space complexity:
+  * - groupBy is O(n)
+  * */
+  private def algorithmWithGroupBy(values: Iterable[Int]) = {
+    values.groupBy(identity).find((el: (Int, Iterable[Int])) => el._2.size % 2 == 1)
+      .getOrElse(throw new IllegalArgumentException(s"Wrong input. Not found odd occurrences of value"))
+      ._1
+  }
+
+  /*
+  * Complexity:
+  * Time complexity:
+  * - iteration with adding elements to Map is 0(n)
+  * - find is O(lg(n)) in normal case. In worse case is 0(n).
+  *
+  * Space complexity:
+  * - iteration with adding elements to Map is 0(n)
+  * */
+  private def algorithmWithHashMap(values: Iterable[Int]) = {
+    val map = mutable.Map.empty[Int, Int]
+
+    values.foreach { value =>
+      val currentOccurrences = map.getOrElse(value, 0)
+      map(value) = currentOccurrences + 1
     }
 
-    saveAsTSVFile(output, resultRDD)
-    //saveAsTextWithTSVFormat(output, resultRDD)
-    //saveAsCSVWithTSVFormat(output, resultRDD, spark)
+    map
+      .find(el => el._2 % 2 == 1)
+      .getOrElse(throw new IllegalArgumentException(s"Wrong input. Not found odd occurrences of value"))
+      ._1
   }
 
   //TODO maybe I should create output dir if it not exists. Not specified.
